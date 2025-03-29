@@ -75,3 +75,99 @@ func (p *ProductService) GetProduct(ctx context.Context, id *productPb.Id) (*pro
 
 	return &product, nil
 }
+
+func (p *ProductService) CreateProduct(ctx context.Context, productData *productPb.Product) (*productPb.Id, error) {
+	var Response productPb.Id
+
+	err := p.DB.Transaction(func(tx *gorm.DB) error {
+		category := productPb.Category{
+			Id:   0,
+			Name: productData.GetCategory().Name,
+		}
+
+		if err := tx.Table("categories").
+			Where("name = ?", category.GetName()).FirstOrCreate(&category).Error; err != nil {
+			return err
+		}
+
+		product := struct {
+			Id          uint64
+			Name        string
+			Price       float64
+			Stock       uint32
+			Category_Id uint32
+		}{
+			Id:          productData.GetId(),
+			Name:        productData.GetName(),
+			Price:       productData.GetPrice(),
+			Stock:       productData.GetStock(),
+			Category_Id: category.GetId(),
+		}
+
+		if err := tx.Table("products").Create(&product).Error; err != nil {
+			return err
+		}
+
+		Response.Id = product.Id
+		return nil
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &Response, nil
+}
+
+func (p *ProductService) UpdateProduct(ctx context.Context, productData *productPb.Product) (*productPb.Status, error) {
+	var Response productPb.Status
+
+	err := p.DB.Transaction(func(tx *gorm.DB) error {
+		category := productPb.Category{
+			Id:   0,
+			Name: productData.GetCategory().Name,
+		}
+
+		if err := tx.Table("categories").
+			Where("name = ?", category.GetName()).FirstOrCreate(&category).Error; err != nil {
+			return err
+		}
+
+		product := struct {
+			Id          uint64
+			Name        string
+			Price       float64
+			Stock       uint32
+			Category_Id uint32
+		}{
+			Id:          productData.GetId(),
+			Name:        productData.GetName(),
+			Price:       productData.GetPrice(),
+			Stock:       productData.GetStock(),
+			Category_Id: category.GetId(),
+		}
+
+		if err := tx.Table("products").Where("id = ?", product.Id).Updates(&product).Error; err != nil {
+			return err
+		}
+
+		Response.Status = 1
+		return nil
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &Response, nil
+}
+
+func (p *ProductService) DeleteProduct(ctx context.Context, id *productPb.Id) (*productPb.Status, error) {
+	var response productPb.Status
+
+	if err := p.DB.Table("products").Where("id = ?", id.GetId()).Delete(nil).Error; err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	response.Status = 1
+
+	return &response, nil
+}
